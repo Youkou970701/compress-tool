@@ -1,6 +1,6 @@
 {
   "name": "compress-tool",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "文件压缩工具：图片 / 视频 / PDF / PPT·Word·Excel / ZIP",
   "main": "src/main.js",
   "scripts": {
