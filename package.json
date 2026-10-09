@@ -22,7 +22,7 @@
   "build": {
     "appId": "com.xiaoyang.compresstool",
     "productName": "压缩工具",
-    "artifactName": "压缩工具-${version}-${arch}.${ext}",
+    "artifactName": "CompressTool-${version}-${os}-${arch}.${ext}",
     "electronVersion": "44.7.0",
     "files": [
       "src/**/*",
