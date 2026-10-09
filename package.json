@@ -1,0 +1,72 @@
+{
+  "name": "compress-tool",
+  "version": "0.1.0",
+  "description": "文件压缩工具：图片 / 视频 / PDF / PPT·Word·Excel / ZIP",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node scripts/test.mjs",
+    "dist": "electron-builder",
+    "dist:local": "electron-builder -c.electronDist=node_modules/electron/dist --mac --arm64"
+  },
+  "dependencies": {
+    "ffmpeg-static": "^5.3.0",
+    "jszip": "^3.10.2",
+    "sharp": "^0.35.5"
+  },
+  "devDependencies": {
+    "electron-builder": "^26.15.3",
+    "electron": "^44.7.0"
+  },
+  "author": "xiaoyang",
+  "build": {
+    "appId": "com.xiaoyang.compresstool",
+    "productName": "压缩工具",
+    "artifactName": "压缩工具-${version}-${arch}.${ext}",
+    "electronVersion": "44.7.0",
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/ffmpeg-static/ffmpeg"
+    ],
+    "extraResources": [
+      {
+        "from": "vendor/gs",
+        "to": "gs"
+      }
+    ],
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "identity": null,
+      "category": "public.app-category.utilities"
+    },
+    "dmg": {
+      "sign": false
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

@@ -1,0 +1,33 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Ghostscript (mac)
+        if: runner.os == 'macOS'
+        run: brew install ghostscript dylibbundler && bash scripts/vendor-gs-mac.sh
+      - name: Ghostscript (win)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: choco install ghostscript -y --no-progress && bash scripts/vendor-gs-win.sh
+      - run: npm ci
+      - name: 确保 ffmpeg 二进制已下载（npm 可能拦截安装脚本）
+        run: node node_modules/ffmpeg-static/install.js
+      - name: Build & publish
+        run: npx electron-builder --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false

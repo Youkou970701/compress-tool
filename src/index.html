@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>压缩工具</title>
+<style>
+:root{--bg:#f5f5f7;--card:#fff;--fg:#1d1d1f;--mute:#86868b;--line:#e5e5ea;--acc:#0a84ff;--ok:#30a14e;--bad:#d93025}
+@media(prefers-color-scheme:dark){:root{--bg:#1c1c1e;--card:#2c2c2e;--fg:#f5f5f7;--mute:#98989d;--line:#3a3a3c;--acc:#0a84ff;--ok:#32d74b;--bad:#ff6961}}
+*{box-sizing:border-box}
+body{margin:0;font:14px -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;background:var(--bg);color:var(--fg);height:100vh;display:flex;flex-direction:column;padding:44px 20px 16px;-webkit-user-select:none}
+body::before{content:"";position:fixed;top:0;left:0;right:0;height:36px;-webkit-app-region:drag}
+#drop{border:2px dashed var(--line);border-radius:14px;padding:26px;text-align:center;color:var(--mute);cursor:pointer;transition:.15s;background:var(--card)}
+#drop.over{border-color:var(--acc);color:var(--acc)}
+#drop b{display:block;font-size:16px;color:var(--fg);margin-bottom:4px}
+.opts{display:flex;gap:18px;align-items:center;margin:14px 2px;flex-wrap:wrap}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--card)}
+.seg button{border:0;background:none;color:var(--fg);padding:6px 14px;font:inherit;cursor:pointer}
+.seg button.on{background:var(--acc);color:#fff}
+input[type=number]{width:72px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--fg);font:inherit}
+#list{flex:1;overflow:auto;display:flex;flex-direction:column;gap:8px}
+.row{background:var(--card);border-radius:10px;padding:10px 14px;display:grid;grid-template-columns:1fr auto;gap:4px 12px;align-items:center}
+.name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.st{color:var(--mute);font-size:12.5px;text-align:right}
+.st.ok{color:var(--ok)}.st.bad{color:var(--bad)}
+.bar{grid-column:1/3;height:3px;background:var(--line);border-radius:2px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--acc);transition:width .2s}
+.note{grid-column:1/3;font-size:12px;color:var(--mute)}
+a{color:var(--acc);cursor:pointer;margin-left:8px}
+.hint{color:var(--mute);font-size:12px}
+</style></head><body>
+<div id="drop"><b>把文件拖到这里，或点击选择</b>图片 · 视频 · PDF · PPT / Word / Excel · ZIP，可多选</div>
+<div class="opts">
+  <span>强度</span>
+  <span class="seg" id="level"><button data-v="light">轻度</button><button data-v="medium" class="on">标准</button><button data-v="strong">强力</button></span>
+  <span>目标大小 <input id="target" type="number" min="0" step="1" placeholder="不限"> MB</span>
+  <span class="hint">填了目标大小，会自动从轻到重逐档尝试</span>
+</div>
+<div id="list"></div>
+<script>
+let level='medium',n=0;const rows={};
+const fmt=b=>b>=1048576?(b/1048576).toFixed(1)+' MB':(b/1024).toFixed(0)+' KB';
+document.getElementById('level').onclick=e=>{const v=e.target.dataset.v;if(!v)return;level=v;[...e.currentTarget.children].forEach(b=>b.classList.toggle('on',b.dataset.v===v))};
+const drop=document.getElementById('drop');
+drop.onclick=async()=>add(await api.pick());
+['dragover','dragenter'].forEach(t=>addEventListener(t,e=>{e.preventDefault();drop.classList.add('over')}));
+['dragleave','drop'].forEach(t=>addEventListener(t,e=>{e.preventDefault();drop.classList.remove('over')}));
+addEventListener('drop',e=>{add([...e.dataTransfer.files].map(f=>api.pathOf(f)))});
+api.onProgress(({id,p})=>{const r=rows[id];if(r){r.bar.style.width=(p*100)+'%';r.st.textContent=Math.round(p*100)+'%'}});
+const queue=[];let busy=false;
+function add(files){for(const f of files)queue.push(f);pump()}
+async function pump(){
+  if(busy)return;busy=true;
+  while(queue.length){
+    const file=queue.shift(),id=++n,name=file.split('/').pop();
+    const el=document.createElement('div');el.className='row';
+    el.innerHTML='<div class="name"></div><div class="st">处理中…</div><div class="bar"><i></i></div>';
+    el.firstChild.textContent=name;document.getElementById('list').prepend(el);
+    const r=rows[id]={st:el.querySelector('.st'),bar:el.querySelector('i')};
+    if(!await api.supported(file)){r.st.textContent='不支持的类型';r.st.className='st bad';el.querySelector('.bar').remove();continue}
+    const res=await api.compress({id,file,level,targetMB:parseFloat(document.getElementById('target').value)||0});
+    el.querySelector('.bar').remove();
+    if(!res.ok){r.st.textContent='失败';r.st.className='st bad';addNote(el,res.note)}
+    else if(res.output){
+      r.st.className='st ok';r.st.textContent=fmt(res.before)+' → '+fmt(res.after)+'（省 '+Math.round((1-res.after/res.before)*100)+'%）';
+      const a=document.createElement('a');a.textContent='在访达中显示';a.onclick=()=>api.reveal(res.output);r.st.appendChild(a);
+      if(res.note)addNote(el,res.note);
+    }else{r.st.textContent=fmt(res.before);addNote(el,res.note)}
+  }
+  busy=false;
+}
+function addNote(el,t){if(!t)return;const d=document.createElement('div');d.className='note';d.textContent=t;el.appendChild(d)}
+</script></body></html>
