@@ -18,7 +18,8 @@ const IMG = new Set(['.jpg', '.jpeg', '.png', '.webp', '.heic', '.tif', '.tiff']
 const VID = new Set(['.mp4', '.mov', '.m4v', '.mkv', '.avi', '.webm']);
 const ZIPLIKE = new Set(['.zip', '.pptx', '.docx', '.xlsx', '.ppsx', '.potx']);
 
-const MB = 1024 * 1024;
+// 与访达/资源管理器一致：1 MB = 1000×1000 字节，避免「填 50 实际 52」
+const MB = 1000 * 1000;
 
 function kindOf(file) {
   const e = path.extname(file).toLowerCase();
@@ -167,8 +168,27 @@ async function recompressMedia(buf, name, step, onProgress) {
   return buf;
 }
 
-async function compressZip(input, out, { level, targetBytes }, onProgress) {
+// 内嵌字体：pptx 的 ppt/fonts/*.fntdata、docx 的 word/fonts/*.odttf。体积可达几十 MB，
+// 但移除后对方电脑缺字体时会换成默认字体，所以只在用户明确勾选时才删。
+const FONT_RE = /^(ppt|word)\/fonts\//;
+const fontBytes = (zip) => Object.keys(zip.files).filter((n) => FONT_RE.test(n))
+  .reduce((a, n) => a + (zip.files[n]._data?.compressedSize || 0), 0);
+
+async function stripEmbeddedFonts(zip) {
+  for (const n of Object.keys(zip.files)) if (FONT_RE.test(n)) zip.remove(n);
+  const edit = async (name, fn) => { const f = zip.file(name); if (f) zip.file(name, fn(await f.async('string'))); };
+  // pptx：去掉 <p:embeddedFontLst> 及 presentation.xml.rels 里指向字体的关系
+  await edit('ppt/presentation.xml', (x) => x.replace(/<p:embeddedFontLst>[\s\S]*?<\/p:embeddedFontLst>/g, ''));
+  await edit('ppt/_rels/presentation.xml.rels', (x) => x.replace(/<Relationship\b[^>]*\/relationships\/font"[^>]*\/>/g, '').replace(/<Relationship\b[^>]*Target="fonts\/[^"]*"[^>]*\/>/g, ''));
+  // docx：去掉 fontTable 里的 embed* 引用，并删掉它的关系文件
+  await edit('word/fontTable.xml', (x) => x.replace(/<w:embed(Regular|Bold|Italic|BoldItalic)\b[^>]*\/>/g, ''));
+  zip.remove('word/_rels/fontTable.xml.rels');
+}
+
+async function compressZip(input, out, { level, targetBytes, removeFonts, info }, onProgress) {
   const src = await JSZip.loadAsync(fs.readFileSync(input));
+  if (removeFonts) await stripEmbeddedFonts(src);
+  else if (info) info.fontBytes = fontBytes(src);
   const names = Object.keys(src.files).filter((n) => !src.files[n].dir);
   const steps = targetBytes ? LADDER : [{ ...LEVELS[level], h: { light: 2160, medium: 1080, strong: 720 }[level] }];
   const cache = new Map();
@@ -210,10 +230,11 @@ async function compressFile(input, opts = {}, onProgress) {
   if (targetBytes && before <= targetBytes) return { ok: true, input, before, after: before, note: '已满足目标大小，无需压缩' };
 
   const out = outputPath(input);
+  const info = {};
   const tmpOut = tmp(path.extname(out) || '.bin');
   let produced;
   try {
-    const o = { level, targetBytes };
+    const o = { level, targetBytes, removeFonts: !!opts.removeFonts, info };
     if (kind === 'image') produced = await compressImage(input, tmpOut, o);
     else if (kind === 'video') produced = await compressVideo(input, tmpOut, o, onProgress);
     else if (kind === 'pdf') produced = await compressPdf(input, tmpOut, o);
@@ -223,7 +244,10 @@ async function compressFile(input, opts = {}, onProgress) {
     const final = path.join(path.dirname(out), path.basename(out, path.extname(out)) + path.extname(produced));
     fs.copyFileSync(produced, final);
     const res = { ok: true, input, output: final, before, after };
-    if (targetBytes && after > targetBytes) res.note = '已压到当前方法的极限，仍未达到目标大小';
+    if (targetBytes && after > targetBytes) {
+      res.note = '已压到当前方法的极限，仍未达到目标大小';
+      if (info.fontBytes > 2 * MB) res.note += `。文件里内嵌字体占约 ${(info.fontBytes / MB).toFixed(0)} MB，勾选「移除内嵌字体」可继续压（对方电脑没有该字体时会换成默认字体）`;
+    }
     return res;
   } catch (e) {
     return { ok: false, input, before, note: e.message };

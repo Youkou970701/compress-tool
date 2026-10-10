@@ -16,8 +16,8 @@ ipcMain.handle('pick', async () => {
   return r.canceled ? [] : r.filePaths;
 });
 ipcMain.handle('supported', (_, f) => !!kindOf(f));
-ipcMain.handle('compress', async (e, { id, file, level, targetMB }) =>
-  compressFile(file, { level, targetMB }, (p) => e.sender.send('progress', { id, p })));
+ipcMain.handle('compress', async (e, { id, file, level, targetMB, removeFonts }) =>
+  compressFile(file, { level, targetMB, removeFonts }, (p) => e.sender.send('progress', { id, p })));
 ipcMain.handle('reveal', (_, f) => shell.showItemInFolder(f));
 
 app.whenReady().then(createWindow);

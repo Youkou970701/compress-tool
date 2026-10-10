@@ -30,12 +30,13 @@ a{color:var(--acc);cursor:pointer;margin-left:8px}
   <span>强度</span>
   <span class="seg" id="level"><button data-v="light">轻度</button><button data-v="medium" class="on">标准</button><button data-v="strong">强力</button></span>
   <span>目标大小 <input id="target" type="number" min="0" step="1" placeholder="不限"> MB</span>
+  <label title="PPT/Word 里嵌入的字体可能有几十 MB。移除后，对方电脑没有该字体时会显示成默认字体"><input type="checkbox" id="fonts"> 移除内嵌字体</label>
   <span class="hint">填了目标大小，会自动从轻到重逐档尝试</span>
 </div>
 <div id="list"></div>
 <script>
 let level='medium',n=0;const rows={};
-const fmt=b=>b>=1048576?(b/1048576).toFixed(1)+' MB':(b/1024).toFixed(0)+' KB';
+const fmt=b=>b>=1e6?(b/1e6).toFixed(1)+' MB':(b/1e3).toFixed(0)+' KB';
 document.getElementById('level').onclick=e=>{const v=e.target.dataset.v;if(!v)return;level=v;[...e.currentTarget.children].forEach(b=>b.classList.toggle('on',b.dataset.v===v))};
 const drop=document.getElementById('drop');
 drop.onclick=async()=>add(await api.pick());
@@ -54,7 +55,7 @@ async function pump(){
     el.firstChild.textContent=name;document.getElementById('list').prepend(el);
     const r=rows[id]={st:el.querySelector('.st'),bar:el.querySelector('i')};
     if(!await api.supported(file)){r.st.textContent='不支持的类型';r.st.className='st bad';el.querySelector('.bar').remove();continue}
-    const res=await api.compress({id,file,level,targetMB:parseFloat(document.getElementById('target').value)||0});
+    const res=await api.compress({id,file,level,targetMB:parseFloat(document.getElementById('target').value)||0,removeFonts:document.getElementById('fonts').checked});
     el.querySelector('.bar').remove();
     if(!res.ok){r.st.textContent='失败';r.st.className='st bad';addNote(el,res.note)}
     else if(res.output){

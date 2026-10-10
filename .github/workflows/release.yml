@@ -6,7 +6,18 @@ on:
 permissions:
   contents: write
 jobs:
+  # 先建好 release，两个平台再往里传文件，避免同时创建出两个草稿
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 创建 release（已存在则跳过）
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "压缩工具 $GITHUB_REF_NAME" --notes "下载对应系统的安装包：macOS 选 .dmg，Windows 选 .exe。"
   build:
+    needs: prepare
     strategy:
       fail-fast: false
       matrix:
