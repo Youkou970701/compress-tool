@@ -13,7 +13,7 @@
       targetUnmet: '已压到当前方法的极限，仍未达到目标大小',
       targetUnmetFonts: '已压到当前方法的极限，仍未达到目标大小。文件里内嵌字体占约 {fontMB} MB，勾选「移除内嵌字体」可继续压（对方电脑没有该字体时会换成默认字体）',
       ffmpegFailed: 'ffmpeg 失败：{detail}', ghostscriptFailed: 'Ghostscript 失败：{detail}',
-      ghostscriptMissing: '未找到内置的 Ghostscript，请重新安装本应用', compressionFailed: '压缩失败：{detail}' 
+      ghostscriptMissing: '未找到内置的 Ghostscript，请重新安装本应用', compressionFailed: '压缩失败：{detail}'
     },
     en: {
       appTitle: 'Compression Tool', languageName: 'EN', languageLabel: 'Interface language',
@@ -28,7 +28,7 @@
       targetUnmet: 'The current method reached its limit, but the target size was not met.',
       targetUnmetFonts: 'The current method reached its limit, but the target size was not met. Embedded fonts take about {fontMB} MB. Try Remove embedded fonts; computers without those fonts will use default fonts instead.',
       ffmpegFailed: 'ffmpeg failed: {detail}', ghostscriptFailed: 'Ghostscript failed: {detail}',
-      ghostscriptMissing: 'Bundled Ghostscript was not found. Please reinstall this app.', compressionFailed: 'Compression failed: {detail}' 
+      ghostscriptMissing: 'Bundled Ghostscript was not found. Please reinstall this app.', compressionFailed: 'Compression failed: {detail}'
     },
     ja: {
       appTitle: '圧縮ツール', languageName: '日本語', languageLabel: '表示言語',
@@ -43,7 +43,7 @@
       targetUnmet: '現在の方法ではこれ以上圧縮できません。目標サイズには達していません。',
       targetUnmetFonts: '現在の方法ではこれ以上圧縮できません。目標サイズには達していません。埋め込みフォントが約 {fontMB} MB あります。「埋め込みフォントを削除」をお試しください。同じフォントがないパソコンでは既定のフォントに置き換わります。',
       ffmpegFailed: 'ffmpeg の処理に失敗しました：{detail}', ghostscriptFailed: 'Ghostscript の処理に失敗しました：{detail}',
-      ghostscriptMissing: '内蔵の Ghostscript が見つかりません。アプリを再インストールしてください。', compressionFailed: '圧縮に失敗しました：{detail}' 
+      ghostscriptMissing: '内蔵の Ghostscript が見つかりません。アプリを再インストールしてください。', compressionFailed: '圧縮に失敗しました：{detail}'
     }
   };
   function resolveLanguage(locale) {
