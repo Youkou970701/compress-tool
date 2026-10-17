@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="build/icon.png" width="112" alt="Compress Tool">
+<img src="build/icon.png" width="112" alt="Compression Tool">
 
-# Compress Tool
+# Compression Tool
 
 **Drop files in, get them smaller. Images, videos, PDFs, PowerPoint / Word / Excel and ZIP in one window.**
 
