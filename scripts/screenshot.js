@@ -10,6 +10,11 @@ process.on('exit',()=>fs.rmSync(profile,{recursive:true,force:true}));
 const language = process.argv[2] || 'zh-CN';
 if (!['zh-CN', 'en', 'ja'].includes(language)) throw new Error('Unsupported screenshot language');
 process.env.COMPRESS_SCREENSHOT_LANG = language;
+const demoNames = {
+  'zh-CN': ['宣传视频.mp4', '作品集.zip', '分镜头脚本.docx', '投放方案.pdf'],
+  en: ['promo-video.mp4', 'portfolio.zip', 'storyboard.docx', 'proposal.pdf'],
+  ja: ['プロモーション動画.mp4', 'ポートフォリオ.zip', '絵コンテ.docx', '企画書.pdf'],
+};
 app.whenReady().then(async () => {
   try {
     const win = new BrowserWindow({ width: 760, height: 560, show: false, webPreferences: { contextIsolation: false, preload: path.join(__dirname, 'mock-preload.js') } });
@@ -17,11 +22,12 @@ app.whenReady().then(async () => {
     await win.webContents.executeJavaScript(`window.i18nReady`);
     await win.webContents.executeJavaScript(`
       setLanguage(${JSON.stringify(language)});
+      const names = ${JSON.stringify(demoNames[language])};
       const demo = [
-        ['宣传视频.mp4', 157.7e6, 28.1e6, 82],
-        ['作品集.zip', 22e6, 13.9e6, 37],
-        ['分镜头脚本.docx', 4e6, 2.1e6, 48],
-        ['投放方案.pdf', 7.3e6, 1.9e6, 74],
+        [names[0], 157.7e6, 28.1e6, 82],
+        [names[1], 22e6, 13.9e6, 37],
+        [names[2], 4e6, 2.1e6, 48],
+        [names[3], 7.3e6, 1.9e6, 74],
       ];
       const list = document.getElementById('list');
       for (const [name, before, after, percent] of demo) {
