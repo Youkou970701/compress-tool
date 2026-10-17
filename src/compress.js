@@ -20,6 +20,14 @@ const ZIPLIKE = new Set(['.zip', '.pptx', '.docx', '.xlsx', '.ppsx', '.potx']);
 
 // 与访达/资源管理器一致：1 MB = 1000×1000 字节，避免「填 50 实际 52」
 const MB = 1000 * 1000;
+const MESSAGE_CODES = Object.freeze([
+  'unsupportedType', 'targetSatisfied', 'noSmallerOutput', 'targetUnmet', 'targetUnmetFonts',
+  'ffmpegFailed', 'ghostscriptFailed', 'ghostscriptMissing', 'compressionFailed',
+]);
+const OUTPUT_SUFFIXES = Object.freeze({ 'zh-CN': '压缩', en: 'compressed', ja: '圧縮' });
+function failure(code, params = {}) {
+  return Object.assign(new Error(code), { code, params });
+}
 
 function kindOf(file) {
   const e = path.extname(file).toLowerCase();
@@ -94,8 +102,8 @@ function runFfmpeg(args, duration, onProgress) {
       const m = /out_time_us=(\d+)/.exec(String(d));
       if (m && duration) onProgress?.(Math.min(0.99, +m[1] / 1e6 / duration));
     });
-    p.on('error', reject);
-    p.on('close', (c) => (c === 0 ? resolve() : reject(new Error('ffmpeg 失败: ' + err.slice(-300)))));
+    p.on('error', (e) => reject(failure('ffmpegFailed', { detail: e.message })));
+    p.on('close', (c) => (c === 0 ? resolve() : reject(failure('ffmpegFailed', { detail: err.slice(-300) }))));
   });
 }
 
@@ -126,12 +134,12 @@ function runGs(input, out, preset) {
   return new Promise((resolve, reject) => {
     execFile(GS, ['-sDEVICE=pdfwrite', '-dCompatibilityLevel=1.5', `-dPDFSETTINGS=${preset}`, '-dNOPAUSE', '-dQUIET', '-dBATCH',
       '-dDetectDuplicateImages=true', '-dCompressFonts=true', ...GS_ARGS, `-sOutputFile=${out}`, input],
-      { maxBuffer: 1 << 26 }, (e, so, se) => (e ? reject(new Error('Ghostscript 失败: ' + (se || e.message))) : resolve()));
+      { maxBuffer: 1 << 26 }, (e, so, se) => (e ? reject(failure('ghostscriptFailed', { detail: (se || e.message).slice(-300) })) : resolve()));
   });
 }
 
 async function compressPdf(input, out, { level, targetBytes }) {
-  if (!GS) throw new Error('未找到内置的 Ghostscript，请重新安装本应用');
+  if (!GS) throw failure('ghostscriptMissing');
   const presets = targetBytes ? ['/printer', '/ebook', '/screen'] : [LEVELS[level].pdf];
   for (const p of presets) {
     await runGs(input, out, p);
@@ -210,26 +218,30 @@ async function compressZip(input, out, { level, targetBytes, removeFonts, info }
 }
 
 // ---------- 入口 ----------
-function outputPath(input) {
-  const { dir, name, ext } = path.parse(input);
-  let p = path.join(dir, `${name}-压缩${ext}`), i = 2;
-  while (fs.existsSync(p)) p = path.join(dir, `${name}-压缩${i++}${ext}`);
+function outputPath(input, language = 'zh-CN') {
+  const { dir, name, ext: inputExt } = path.parse(input);
+  const ext = kindOf(input) === 'video' ? '.mp4' : inputExt.toLowerCase() === '.heic' ? '.jpg' : inputExt;
+  const suffix = OUTPUT_SUFFIXES[language] || OUTPUT_SUFFIXES['zh-CN'];
+  let p = path.join(dir, `${name}-${suffix}${ext}`), i = 2;
+  while (fs.existsSync(p)) p = path.join(dir, `${name}-${suffix}${i++}${ext}`);
   return p;
 }
 
 /**
- * opts: { level: 'light'|'medium'|'strong', targetMB?: number }
- * 返回 { ok, input, output?, before, after?, note? }；压不小则不产生输出文件。
+ * opts: { level: 'light'|'medium'|'strong', targetMB?: number, language?: 'zh-CN'|'en'|'ja' }
+ * 返回 { ok, input, output?, before, after?, code?, params? }；压不小则不产生输出文件。
  */
 async function compressFile(input, opts = {}, onProgress) {
   const level = opts.level || 'medium';
   const targetBytes = opts.targetMB > 0 ? Math.floor(opts.targetMB * MB) : 0;
   const kind = kindOf(input);
-  const before = size(input);
-  if (!kind) return { ok: false, input, before, note: '不支持的文件类型' };
-  if (targetBytes && before <= targetBytes) return { ok: true, input, before, after: before, note: '已满足目标大小，无需压缩' };
+  let before;
+  try { before = size(input); }
+  catch (e) { return { ok: false, input, code: 'compressionFailed', params: { detail: e.message } }; }
+  if (!kind) return { ok: false, input, before, code: 'unsupportedType', params: {} };
+  if (targetBytes && before <= targetBytes) return { ok: true, input, before, after: before, code: 'targetSatisfied', params: {} };
 
-  const out = outputPath(input);
+  const out = outputPath(input, opts.language);
   const info = {};
   const tmpOut = tmp(path.extname(out) || '.bin');
   let produced;
@@ -240,21 +252,26 @@ async function compressFile(input, opts = {}, onProgress) {
     else if (kind === 'pdf') produced = await compressPdf(input, tmpOut, o);
     else produced = await compressZip(input, tmpOut, o, onProgress);
     const after = size(produced);
-    if (after >= before) return { ok: true, input, before, after: before, note: '已经很小了，压缩后反而更大，未生成新文件' };
+    if (after >= before) return { ok: true, input, before, after: before, code: 'noSmallerOutput', params: {} };
     const final = path.join(path.dirname(out), path.basename(out, path.extname(out)) + path.extname(produced));
     fs.copyFileSync(produced, final);
     const res = { ok: true, input, output: final, before, after };
     if (targetBytes && after > targetBytes) {
-      res.note = '已压到当前方法的极限，仍未达到目标大小';
-      if (info.fontBytes > 2 * MB) res.note += `。文件里内嵌字体占约 ${(info.fontBytes / MB).toFixed(0)} MB，勾选「移除内嵌字体」可继续压（对方电脑没有该字体时会换成默认字体）`;
+      res.code = 'targetUnmet';
+      res.params = {};
+      if (info.fontBytes > 2 * MB) {
+        res.code = 'targetUnmetFonts';
+        res.params.fontMB = Math.round(info.fontBytes / MB);
+      }
     }
     return res;
   } catch (e) {
-    return { ok: false, input, before, note: e.message };
+    return { ok: false, input, before, code: MESSAGE_CODES.includes(e.code) ? e.code : 'compressionFailed',
+      params: e.params || { detail: e.message } };
   } finally {
     fs.rmSync(tmpOut, { force: true });
     if (produced && produced !== tmpOut) fs.rmSync(produced, { force: true });
   }
 }
 
-module.exports = { compressFile, kindOf };
+module.exports = { compressFile, kindOf, MESSAGE_CODES };

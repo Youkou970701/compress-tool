@@ -1,5 +1,6 @@
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 contextBridge.exposeInMainWorld('api', {
+  getLocale: () => ipcRenderer.invoke('locale'),
   pathOf: (f) => webUtils.getPathForFile(f),
   pick: () => ipcRenderer.invoke('pick'),
   supported: (f) => ipcRenderer.invoke('supported', f),

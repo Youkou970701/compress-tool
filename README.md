@@ -8,6 +8,8 @@
 
 告诉它「要小于 50 MB」，它自己找到刚好够用的那一档。
 
+**中文** · [English](README.en.md) · [日本語](README.ja.md)
+
 [![Release](https://img.shields.io/github/v/release/Youkou970701/compress-tool?style=flat-square&color=5b6cff)](https://github.com/Youkou970701/compress-tool/releases/latest)
 ![Platform](https://img.shields.io/badge/平台-macOS%20·%20Windows-5b6cff?style=flat-square)
 ![Offline](https://img.shields.io/badge/完全离线-文件不上传-2ea44f?style=flat-square)

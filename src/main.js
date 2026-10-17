@@ -11,13 +11,14 @@ function createWindow() {
   win.loadFile(path.join(__dirname, 'index.html'));
 }
 
+ipcMain.handle('locale', () => app.getLocale());
 ipcMain.handle('pick', async () => {
   const r = await dialog.showOpenDialog({ properties: ['openFile', 'multiSelections'] });
   return r.canceled ? [] : r.filePaths;
 });
 ipcMain.handle('supported', (_, f) => !!kindOf(f));
-ipcMain.handle('compress', async (e, { id, file, level, targetMB, removeFonts }) =>
-  compressFile(file, { level, targetMB, removeFonts }, (p) => e.sender.send('progress', { id, p })));
+ipcMain.handle('compress', async (e, { id, file, level, targetMB, removeFonts, language }) =>
+  compressFile(file, { level, targetMB, removeFonts, language }, (p) => e.sender.send('progress', { id, p })));
 ipcMain.handle('reveal', (_, f) => shell.showItemInFolder(f));
 
 app.whenReady().then(createWindow);

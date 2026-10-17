@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><title>压缩工具</title>
+<html lang="en"><head><meta charset="utf-8"><title></title>
 <style>
 :root{--bg:#f5f5f7;--card:#fff;--fg:#1d1d1f;--mute:#86868b;--line:#e5e5ea;--acc:#0a84ff;--ok:#30a14e;--bad:#d93025}
 @media(prefers-color-scheme:dark){:root{--bg:#1c1c1e;--card:#2c2c2e;--fg:#f5f5f7;--mute:#98989d;--line:#3a3a3c;--acc:#0a84ff;--ok:#32d74b;--bad:#ff6961}}
 *{box-sizing:border-box}
-body{margin:0;font:14px -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;background:var(--bg);color:var(--fg);height:100vh;display:flex;flex-direction:column;padding:44px 20px 16px;-webkit-user-select:none}
+body{margin:0;font:14px -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans","Yu Gothic",sans-serif;background:var(--bg);color:var(--fg);height:100vh;display:flex;flex-direction:column;padding:44px 20px 16px;-webkit-user-select:none}
 body::before{content:"";position:fixed;top:0;left:0;right:0;height:36px;-webkit-app-region:drag}
 #drop{border:2px dashed var(--line);border-radius:14px;padding:26px;text-align:center;color:var(--mute);cursor:pointer;transition:.15s;background:var(--card)}
 #drop.over{border-color:var(--acc);color:var(--acc)}
@@ -24,47 +24,77 @@ input[type=number]{width:72px;padding:6px 8px;border:1px solid var(--line);borde
 .note{grid-column:1/3;font-size:12px;color:var(--mute)}
 a{color:var(--acc);cursor:pointer;margin-left:8px}
 .hint{color:var(--mute);font-size:12px}
+#language{position:absolute;right:20px;top:8px;z-index:1;-webkit-app-region:no-drag;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--fg);font:inherit;padding:3px}body{padding-top:44px}
 </style></head><body>
-<div id="drop"><b>把文件拖到这里，或点击选择</b>图片 · 视频 · PDF · PPT / Word / Excel · ZIP，可多选</div>
+<select id="language"></select>
+<div id="drop"><b data-i18n="drop"></b><span data-i18n="types"></span></div>
 <div class="opts">
-  <span>强度</span>
-  <span class="seg" id="level"><button data-v="light">轻度</button><button data-v="medium" class="on">标准</button><button data-v="strong">强力</button></span>
-  <span>目标大小 <input id="target" type="number" min="0" step="1" placeholder="不限"> MB</span>
-  <label title="PPT/Word 里嵌入的字体可能有几十 MB。移除后，对方电脑没有该字体时会显示成默认字体"><input type="checkbox" id="fonts"> 移除内嵌字体</label>
-  <span class="hint">填了目标大小，会自动从轻到重逐档尝试</span>
+  <span data-i18n="strength"></span>
+  <span class="seg" id="level"><button data-v="light" data-i18n="light"></button><button data-v="medium" class="on" data-i18n="medium"></button><button data-v="strong" data-i18n="strong"></button></span>
+  <span><span data-i18n="target"></span> <input id="target" type="number" min="0" step="1"> MB</span>
+  <label id="font-label"><input type="checkbox" id="fonts"> <span data-i18n="removeFonts"></span></label>
+  <span class="hint" data-i18n="targetHelp"></span>
 </div>
 <div id="list"></div>
+<script src="i18n.js"></script>
 <script>
-let level='medium',n=0;const rows={};
+let level='medium',n=0,language='en';const rows={};
+const t=(key,params)=>I18n.translate(language,key,params);
 const fmt=b=>b>=1e6?(b/1e6).toFixed(1)+' MB':(b/1e3).toFixed(0)+' KB';
+const selector=document.getElementById('language');
+for(const [value,dictionary] of Object.entries(I18n.messages)){
+  const option=document.createElement('option');option.value=value;option.textContent=dictionary.languageName;selector.appendChild(option);
+}
+function setLanguage(value,persist=false){
+  language=Object.hasOwn(I18n.messages,value)?value:'en';
+  if(persist)try{localStorage.setItem('compressLang',language)}catch{}
+  document.documentElement.lang=language;document.title=t('appTitle');selector.value=language;
+  selector.setAttribute('aria-label',t('languageLabel'));
+  document.querySelectorAll('[data-i18n]').forEach(el=>el.textContent=t(el.dataset.i18n));
+  document.getElementById('target').placeholder=t('noLimit');
+  document.getElementById('target').setAttribute('aria-label',t('target'));
+  document.getElementById('font-label').title=t('fontHelp');
+  Object.values(rows).forEach(renderRow);
+}
+selector.onchange=()=>setLanguage(selector.value,true);
+const ready=(async()=>{
+  let saved;try{saved=localStorage.getItem('compressLang')}catch{}
+  const locale=await api.getLocale();setLanguage(Object.hasOwn(I18n.messages,saved)?saved:I18n.resolveLanguage(locale));
+})();
+window.i18nReady=ready;
 document.getElementById('level').onclick=e=>{const v=e.target.dataset.v;if(!v)return;level=v;[...e.currentTarget.children].forEach(b=>b.classList.toggle('on',b.dataset.v===v))};
 const drop=document.getElementById('drop');
 drop.onclick=async()=>add(await api.pick());
-['dragover','dragenter'].forEach(t=>addEventListener(t,e=>{e.preventDefault();drop.classList.add('over')}));
-['dragleave','drop'].forEach(t=>addEventListener(t,e=>{e.preventDefault();drop.classList.remove('over')}));
-addEventListener('drop',e=>{add([...e.dataTransfer.files].map(f=>api.pathOf(f)))});
-api.onProgress(({id,p})=>{const r=rows[id];if(r){r.bar.style.width=(p*100)+'%';r.st.textContent=Math.round(p*100)+'%'}});
+['dragover','dragenter'].forEach(event=>addEventListener(event,e=>{e.preventDefault();drop.classList.add('over')}));
+['dragleave','drop'].forEach(event=>addEventListener(event,e=>{e.preventDefault();drop.classList.remove('over')}));
+addEventListener('drop',e=>add([...e.dataTransfer.files].map(f=>api.pathOf(f))));
+api.onProgress(({id,p})=>{const r=rows[id];if(r){r.progress=p;renderRow(r)}});
 const queue=[];let busy=false;
 function add(files){for(const f of files)queue.push(f);pump()}
-async function pump(){
-  if(busy)return;busy=true;
-  while(queue.length){
-    const file=queue.shift(),id=++n,name=file.split('/').pop();
-    const el=document.createElement('div');el.className='row';
-    el.innerHTML='<div class="name"></div><div class="st">处理中…</div><div class="bar"><i></i></div>';
-    el.firstChild.textContent=name;document.getElementById('list').prepend(el);
-    const r=rows[id]={st:el.querySelector('.st'),bar:el.querySelector('i')};
-    if(!await api.supported(file)){r.st.textContent='不支持的类型';r.st.className='st bad';el.querySelector('.bar').remove();continue}
-    const res=await api.compress({id,file,level,targetMB:parseFloat(document.getElementById('target').value)||0,removeFonts:document.getElementById('fonts').checked});
-    el.querySelector('.bar').remove();
-    if(!res.ok){r.st.textContent='失败';r.st.className='st bad';addNote(el,res.note)}
-    else if(res.output){
-      r.st.className='st ok';r.st.textContent=fmt(res.before)+' → '+fmt(res.after)+'（省 '+Math.round((1-res.after/res.before)*100)+'%）';
-      const a=document.createElement('a');a.textContent='在访达中显示';a.onclick=()=>api.reveal(res.output);r.st.appendChild(a);
-      if(res.note)addNote(el,res.note);
-    }else{r.st.textContent=fmt(res.before);addNote(el,res.note)}
-  }
-  busy=false;
+function renderRow(r){
+  const {el,st,bar,result}=r;st.replaceChildren();el.querySelector('.note')?.remove();
+  if(!result){st.className='st';st.textContent=r.progress==null?t('processing'):Math.round(r.progress*100)+'%';bar.style.width=((r.progress||0)*100)+'%';return}
+  el.querySelector('.bar')?.remove();
+  st.className=result.ok&&result.output?'st ok':result.ok?'st':'st bad';
+  if(!result.ok)st.textContent=t('failed');
+  else if(result.output){
+    st.textContent=t('savings',{before:fmt(result.before),after:fmt(result.after),percent:Math.round((1-result.after/result.before)*100)});
+    const link=document.createElement('a');link.textContent=t('reveal');link.onclick=()=>api.reveal(result.output);st.appendChild(link);
+  }else st.textContent=fmt(result.before);
+  if(result.code){const note=document.createElement('div');note.className='note';note.textContent=t(result.code,result.params);el.appendChild(note)}
 }
-function addNote(el,t){if(!t)return;const d=document.createElement('div');d.className='note';d.textContent=t;el.appendChild(d)}
+async function pump(){
+  if(busy)return;busy=true;await ready;
+  try{while(queue.length){
+    const file=queue.shift(),id=++n,name=file.split(/[\\/]/).pop();
+    const el=document.createElement('div');el.className='row';
+    el.innerHTML='<div class="name"></div><div class="st"></div><div class="bar"><i></i></div>';
+    el.firstChild.textContent=name;document.getElementById('list').prepend(el);
+    const r=rows[id]={el,st:el.querySelector('.st'),bar:el.querySelector('i')};renderRow(r);
+    try{
+      r.result=await api.compress({id,file,level,language,targetMB:parseFloat(document.getElementById('target').value)||0,removeFonts:document.getElementById('fonts').checked});
+    }catch(error){r.result={ok:false,code:'unexpectedError',params:{detail:error.message}}}
+    renderRow(r);
+  }}finally{busy=false}
+}
 </script></body></html>

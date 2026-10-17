@@ -1,11 +1,12 @@
 {
   "name": "compress-tool",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "文件压缩工具：图片 / 视频 / PDF / PPT·Word·Excel / ZIP",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
     "test": "node scripts/test.mjs",
+    "test:ui": "electron scripts/check-ui.cjs",
     "dist": "electron-builder",
     "dist:local": "electron-builder -c.electronDist=node_modules/electron/dist --mac --arm64"
   },
